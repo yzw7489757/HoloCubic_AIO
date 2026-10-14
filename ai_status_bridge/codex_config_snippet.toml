@@ -1,0 +1,4 @@
+# 加到 ~/.codex/config.toml 顶层（必须是用户级配置，项目里的 .codex/config.toml 会忽略 notify）
+# Codex 的 notify 目前只有 agent-turn-complete 一个事件 -> 显示 done
+# 注意: notify 需要绝对路径，把 YOUR_NAME 换成你的 macOS 用户名（终端运行 whoami 查看）
+notify = ["/Users/YOUR_NAME/.holocube/holocube_notify.sh", "--codex"]

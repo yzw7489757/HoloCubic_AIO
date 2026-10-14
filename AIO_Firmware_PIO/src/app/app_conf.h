@@ -17,6 +17,12 @@
 #include "app/example/example.h"
 #endif
 
+// AI 状态灯 (灵动岛) APP
+#define APP_AI_STATUS_USE 1
+#if APP_AI_STATUS_USE
+#include "app/ai_status/ai_status.h"
+#endif
+
 // 纪念日APP
 #define APP_ANNIVERSARY_USE 1
 #if APP_ANNIVERSARY_USE

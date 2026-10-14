@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "~/.holocube/holocube_notify.sh thinking", "async": true, "timeout": 5 } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "~/.holocube/holocube_notify.sh working", "async": true, "timeout": 5 } ] }
+    ],
+    "Notification": [
+      { "hooks": [ { "type": "command", "command": "~/.holocube/holocube_notify.sh waiting", "async": true, "timeout": 5 } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "~/.holocube/holocube_notify.sh done", "async": true, "timeout": 5 } ] }
+    ],
+    "StopFailure": [
+      { "hooks": [ { "type": "command", "command": "~/.holocube/holocube_notify.sh error", "async": true, "timeout": 5 } ] }
+    ]
+  }
+}

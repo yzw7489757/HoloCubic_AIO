@@ -133,6 +133,10 @@ void setup()
     app_controller->init();
 
     // 将APP"安装"到controller里
+#if APP_AI_STATUS_USE
+    // 放在第一个，开机后菜单首页就是它
+    app_controller->app_install(&ai_status_app);
+#endif
 #if APP_WEATHER_USE
     app_controller->app_install(&weather_app);
 #endif
