@@ -1,10 +1,11 @@
 #include "ai_status_gui.h"
-#include "ai_status_font.h"
 #include <Arduino.h>
 #include <string.h>
 
 static lv_obj_t *scr = NULL;
-static const lv_font_t *cn_font = NULL; // SD 卡中文字体，NULL 表示用内置字体
+// 内置中文字体（ai_cn16.c，lv_font_conv 生成，const 数据留在 Flash，不占 RAM）
+// 内容: ASCII + GB2312 一级 3755 字 + 中文标点 + 常用符号 + ~80 个黑白 emoji；缺字回退 montserrat_14
+LV_FONT_DECLARE(ai_cn16);
 static lv_obj_t *lbl_agent, *dot, *lbl_state, *lbl_text, *lbl_elapsed, *lbl_list, *lbl_ip;
 
 static const char *k_names[AI_STATE_NUM] = {"idle", "thinking", "working", "waiting", "done", "error"};
@@ -41,10 +42,8 @@ void ai_status_gui_init(void)
     lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
-    // 尝试从 SD 卡加载中文字体；失败则回退到内置 Montserrat（仅 ASCII）
-    cn_font = ai_font_open(AI_FONT_PATH, &lv_font_montserrat_14);
-    const lv_font_t *f_name = cn_font ? cn_font : &lv_font_montserrat_20;
-    const lv_font_t *f_small = cn_font ? cn_font : &lv_font_montserrat_14;
+    const lv_font_t *f_name = &ai_cn16;
+    const lv_font_t *f_small = &ai_cn16;
 
     lbl_agent = mk_label(f_name, lv_color_white(), 6, 230);
 
@@ -129,7 +128,5 @@ void ai_status_gui_del(void)
         lv_obj_clean(scr);
         scr = NULL;
     }
-    // 标签都删除后再释放字体
-    ai_font_close();
-    cn_font = NULL;
+
 }

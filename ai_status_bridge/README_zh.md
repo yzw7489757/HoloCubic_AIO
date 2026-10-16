@@ -106,5 +106,5 @@ Codex 的 `notify` 目前只在**一轮回答结束**（`agent-turn-complete`）
 | 屏幕一直 `WiFi connecting...` | 先用 WebServer 配 2.4G WiFi；看串口日志；供电是否足够 |
 | curl 超时 | Mac 和小电视是否同一网络；访客网络/AP 隔离会挡住；IP 是否变化；是否已进入 AIStatus APP（只有在该 APP 里才监听 8080） |
 | 状态不更新 | 手动运行 `echo '{}' \| ~/.holocube/holocube_notify.sh working`；检查 `~/.holocube_ip`；Claude 中用 `/hooks` 查看 |
-| 中文显示为方块 | 把 `放置到内存卡/font/ai_cn16.bin` 拷到 SD 卡 `/font/ai_cn16.bin`（FAT32），重启后进入 AIStatus；串口应出现 `CN font loaded` |
+| 个别字显示为空白 | 固件内置字库为 GB2312 一级 3755 字 + 常用符号 + 约 80 个 emoji，二级生僻字不显示；不在字库的 emoji 由 sanitize_text.py 替换为 [文字] |
 | 编译报 `arduino.h`/`EMOJI.h` 找不到 | 大小写问题，本包已修复（macOS 默认不区分大小写，一般不会遇到） |

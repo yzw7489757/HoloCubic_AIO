@@ -31,7 +31,7 @@ AI 工具 (Claude/Codex/Grok) ──hook 触发──▶ ~/.holocube/holocube_no
 |---|---|
 | HoloCubic 小电视 | 已组装好的 ESP32 版（Naive / Metal 均可）。 |
 | USB 数据线 | **必须能传数据**。很多随手拿的线只能充电，插上后电脑完全没反应。 |
-| microSD 卡（可选） | AIStatus 没有 SD 卡也能用；**要显示中文需要 SD 卡**放字体（见 5.2）。相册、视频、天气图标等其他 APP 才需要。官方 Q&A 推荐爱国者 32G、闪迪 32G 普通卡。 |
+| microSD 卡（可选） | AIStatus **不需要** SD 卡，中文字体已内置（见 5.2）。相册、视频、天气图标等其他 APP 才需要。官方 Q&A 推荐爱国者 32G、闪迪 32G 普通卡。 |
 | 2.4 GHz Wi-Fi | ESP32 **不支持 5 GHz**。双频合一的路由器建议单独开一个 2.4G 名称。 |
 | 供电 | 电脑 USB 口或 5V/1A 以上充电头。供电不足时，连 Wi-Fi 那一刻容易重启。 |
 
@@ -125,7 +125,7 @@ pio run -e HoloCubic_AIO_Releases -t upload    # 上传
 pio device monitor -b 115200                   # 串口日志，Ctrl+C 退出
 ```
 
-本补丁在 Linux 上实测编译通过：Flash 87.6%（3,501,384 / 3,997,696 字节），RAM 36.4%（静态）【已编译验证；Mac 上未实机验证】。
+本补丁在 Linux 上实测编译通过：Flash 90.8%（3,629,796 / 3,997,696 字节，剩余约 359 KB），RAM 36.4%（静态，119,300 字节）【已编译验证；Mac 上未实机验证】。
 
 ### 3.4 上传卡住 / 进不了下载模式
 
@@ -211,34 +211,17 @@ pio device monitor -b 115200                   # 串口日志，Ctrl+C 退出
 
 各品牌路由器菜单名不同【未验证具体品牌】。
 
-### 5.2 中文显示：把字体拷到 SD 卡（推荐）
-AIStatus 内置的英文字体不含中文。要显示中文和常用 emoji，需要把字体文件放到 microSD 卡上。
+### 5.2 中文显示（已内置，无需 SD 卡）
+中文字体已经**直接编译进固件**，不需要 SD 卡，刷完固件就能显示中文和常用 emoji【已核对代码 / 已编译】。
 
-1. 用读卡器把 microSD 卡插到 Mac，确认格式是 **FAT32**（「磁盘工具」里显示「MS-DOS (FAT32)」）。如果需要重新格式化：选「MS-DOS (FAT)」+「主引导记录」，**会清空卡**。
-2. 把压缩包里的 `放置到内存卡/font/ai_cn16.bin` 拷到 SD 卡上，**路径必须是**：
-   ```
-   SD卡根目录/font/ai_cn16.bin
-   ```
-   固件读取的路径是 `S:/font/ai_cn16.bin`，其中 `S:` 是工程里 LVGL 文件系统驱动的盘符【已核对代码 `lv_fs_fatfs.c`】。
-3. 在 Finder 里推出 SD 卡，插回小电视，重启，再进入 AIStatus。
-4. 串口日志出现下面这行，就说明加载成功；agent 名称、消息文本、小列表会改用中文字体显示：
-   ```
-   [AIStatus] CN font loaded: 4042 glyphs, RAM 24808 B, free heap ... B
-   ```
-   如果出现 `font S:/font/ai_cn16.bin not found, use built-in font`，说明没找到文件，会**自动回退**到内置英文字体。APP 照常可用，只是中文显示为空白或方块。
-
-字体说明【已核对代码 / 已编译】：
-
-- 内容：ASCII、GB2312 一级常用汉字 3755 个、中文标点、常用符号（← → ✓ ● ★ …）、约 80 个黑白 emoji（✅ ❌ ⚠ 🔥 💡 🤔 🎉 🚀 👍 等），共 4042 个字形。
-- 规格：16px，4bpp 抗锯齿，文件约 744 KB。由 `lv_font_conv` 用 Noto Sans SC（Medium）+ Noto Emoji 生成。
-- **不会把整个字体读进内存**。ESP32（pico32，没有 PSRAM）放不下 700 多 KB，LVGL 自带的 `lv_font_load` 会整个加载，所以没有用它。改为流式读取：内存里只放码点表（约 16 KB）和 48 个字形的缓存（约 8.6 KB），共约 25 KB；其余按需从 SD 卡读取。
-- 空闲内存不足（需要的 25 KB 再加 40 KB 余量）时会放弃加载并回退，避免 WiFi 异常。
-- 状态大字（thinking/done 等）始终用内置英文字体。
-- 退出 APP 时释放字体占用的内存。
-- 电脑端脚本会把字库里没有的 emoji 替换成 `[庆祝]`、`[测试]` 这类文字或直接删掉，并按 UTF-8 字符边界截断到 120 字节。固件端也按字符边界截断，不会切出半个汉字。
-- 不在一级字库里的生僻字会显示为空白。
-
-如需重新生成字体：见 `AIO_Firmware_PIO/tools/build_ai_font.sh`。
+- **字库内容**：ASCII、GB2312 一级常用汉字 3755 个、中文标点、常用符号（← → ✓ ● ★ …）、约 80 个黑白 emoji（✅ ❌ ⚠ 🔥 💡 🤔 🎉 🚀 👍 等），共 4042 个字形。
+- **规格**：16px，**4bpp 抗锯齿 + LVGL 字体压缩**，约 435 KB。用 `lv_font_conv` 从 Noto Sans SC（Medium）+ Noto Emoji 生成，文件是 `src/app/ai_status/ai_cn16.c`。
+- **不占内存**：字体数据是 `const`，留在 Flash 里，不会复制到 RAM。已用符号表确认字形数据位于 `.flash.rodata`。
+- **哪里用中文字体**：agent 名称、消息文本、小列表。状态大字（thinking/done 等）、计时和 IP 仍用内置英文字体。字库里没有的字符会回退到 Montserrat。
+- **为了腾出 Flash 空间，关闭了 LHLXW APP**（它带有大量图片资源，约占 400 KB）。如果需要它，可以在 `src/app/app_conf.h` 里把 `APP_LHLXW_USE` 改回 1，但这样 Flash 会接近满（约 98.7%）。
+- **电脑端脚本会预先处理文本**：字库里没有的 emoji 替换成 `[庆祝]`、`[测试]` 这类文字或直接删掉，并按 UTF-8 字符边界截断到 120 字节。固件端也按字符边界截断，不会切出半个汉字。
+- **生僻字**：不在一级字库里的字会显示为空白。
+- **重新生成字体**：见 `AIO_Firmware_PIO/tools/build_ai_font.sh`。
 
 ---
 
@@ -346,15 +329,15 @@ notify = ["/Users/你的用户名/.holocube/holocube_notify.sh", "--codex"]
 | `Resource busy` / `could not open port` | 串口被其他程序占用 | 关闭 Serial Monitor、其他串口工具、Arduino IDE |
 | 反复重启，尤其在连 Wi-Fi 时；发热严重 | 供电不足；屏幕板/主板 LDO 方案发热、压降大 | 换供电充足的 USB 口或充电头；参考仓库 `硬件版本说明.md`：Metal 屏幕板 v1.2+ 加了一路 LDO 分担电流，v2.0/v2.1 可改焊 DC-DC 方案（此时去掉主板 LDO）以根治发热 |
 | 白屏、花屏、黑屏但串口正常 | 屏幕焊接/排线问题；屏幕型号不符（需 1.3 寸 ST7789 240×240）；`TFT_eSPI` 配置被改 | 检查屏幕焊接；不要随意修改 `lib/TFT_eSPI/User_Setup.h`；背光引脚在 `src/common.h` 中为 IO5（PEAK 版为 IO12） |
-| 串口出现 `sdcard_mount(): f_mount failed: (3) The physical drive cannot work` | 没插卡、卡不兼容、卡槽焊接问题、格式不对 | 没有 SD 卡时 AIStatus 仍可用（只是没有中文）；其他 APP 需要时：换官方推荐的 32G 卡并格式化为 FAT32，检查卡槽焊接（SD 用 SPI：SCK14/MISO26/MOSI13/SS15）。代码里 SD 的 SPI 时钟设为 80 MHz，个别卡不稳定属已知兼容性问题（官方 issue 有此报错） |
+| 串口出现 `sdcard_mount(): f_mount failed: (3) The physical drive cannot work` | 没插卡、卡不兼容、卡槽焊接问题、格式不对 | AIStatus 不需要 SD 卡，**可忽略**；其他 APP 需要时：换官方推荐的 32G 卡并格式化为 FAT32，检查卡槽焊接（SD 用 SPI：SCK14/MISO26/MOSI13/SS15）。代码里 SD 的 SPI 时钟设为 80 MHz，个别卡不稳定属已知兼容性问题（官方 issue 有此报错） |
 | AIStatus 一直显示 `WiFi connecting...` | 没配 Wi-Fi；用的是 5G；密码错；信号弱 | 按第 4 章配网；确认 2.4G；SSID 大小写一致；看串口日志；靠近路由器 |
 | Mac 上 curl 超时、访问不了 IP | 不在同一网络；访客网络 / AP 隔离；IP 变了；没进入 AIStatus；端口写错 | Mac 和小电视连同一个 Wi-Fi，且不是访客网络；关闭路由器「AP 隔离 / 客户端隔离」；看屏幕底部最新 IP；**必须在 AIStatus APP 内**；端口是 **8080**（80 是 WebServer APP 的） |
 | 手势不灵、乱切换、进不去 APP | 开机自动校准时被移动；MPU6050 焊接/I2C（SDA32/SCL33）问题；方向设置不对 | 开机时平放不动等校准完成；倾斜要**保持约 1 秒**；Web 设置里调整「操作方向（0~15可选）」；仍不行检查 MPU6050 焊接（官方 Q&A：IIC 焊接有问题会导致切换不了页面） |
-| 中文显示为空白/方块 | SD 卡上没有字体文件、路径不对，或 SD 卡没挂载，已回退到英文字体 | 按 5.2 把 `ai_cn16.bin` 放到 `SD卡根目录/font/`；看串口是否有 `CN font loaded`；SD 卡用 FAT32 |
-| 串口提示 `font needs ... free heap ... -> skip` | 空闲内存不足，主动放弃加载中文字体 | 关掉其他占内存的功能后重启，再直接进入 AIStatus（可设为开机自启） |
+| 中文全部显示为方块/空白 | 刷的不是带内置中文字体的新固件 | 确认用 `ai-status` 分支最新代码重新编译上传 |
 | 个别汉字显示空白 | 该字不在 GB2312 一级字库（3755 字）里 | 属正常限制；需要的话扩充 `tools/sc.txt` 重新生成字体 |
 | emoji 变成 `[庆祝]` 之类的文字或消失 | 字库只含约 80 个常用 emoji，其余由电脑端脚本替换或删除 | 属设计行为；可在 `sanitize_text.py` 里修改映射 |
-| 第一次显示一段中文时略有停顿 | 字形需要从 SD 卡读取，之后会缓存 | 正常现象【未实机测速】 |
+| 菜单里找不到 LH&LXW APP | 为了给中文字体腾出 Flash 空间，已在 `app_conf.h` 关闭 | 需要时把 `APP_LHLXW_USE` 改为 1（Flash 会接近满） |
+| 编译报 Flash 空间不足 | 又打开了被关闭的 APP，或加了新功能 | 在 `app_conf.h` 关闭不用的 APP |
 | 编译报 `arduino.h: No such file` / `EMOJI.h` | 原仓库头文件大小写不一致，区分大小写的文件系统上会报错 | 本补丁已修正；macOS 默认不区分大小写，一般不会遇到 |
 | 编译报 Flash 空间不足（`region flash overflowed`） | 开了太多 APP | 在 `src/app/app_conf.h` 中把不用的 APP 宏改成 0 |
 | 第一次编译特别慢或下载失败 | 首次需要下载 espressif32 平台和工具链 | 保持网络通畅，重试；必要时开代理 |
@@ -392,7 +375,7 @@ notify = ["/Users/你的用户名/.holocube/holocube_notify.sh", "--codex"]
 |---|---|
 | `agent` | 名字，最长 23 字节（UTF-8 安全截断），不区分大小写匹配；缺省为 `agent` |
 | `state` | 必须是上表 6 个值之一（大小写不敏感），否则返回 400 |
-| `text` | 可选，超过 127 字节会按 UTF-8 字符边界截断并加 `...`；中文需要 SD 卡字体（见 5.2） |
+| `text` | 可选，超过 127 字节会按 UTF-8 字符边界截断并加 `...`；中文由固件内置字体显示（见 5.2） |
 
 - 同时最多记录 4 个 agent，满了会替换最久没更新的那个。
 - 最近一次更新的 agent 显示为主画面。
@@ -429,7 +412,7 @@ curl http://$(cat ~/.holocube_ip):8080/status        # 健康检查
 
 ### 8.5 尚未验证的事项（如实列出）
 
-1. AIStatus 固件和 SD 中文字体**未在真机上运行**（包括流式字体渲染、SD 读取速度、实际空闲内存）：界面排版、RGB 灯颜色、与 WebServer APP 来回切换后端口是否正常释放，都需要实测。
+1. AIStatus 固件和内置中文字体**未在真机上运行**（包括压缩字体的渲染效果和速度）：界面排版、RGB 灯颜色、与 WebServer APP 来回切换后端口是否正常释放，都需要实测。
 2. Mac 上的驱动安装、PlatformIO 上传流程未在 Mac 实机验证。
 3. Grok 读取 Claude hooks 只根据官方文档，未实测。Codex 新版 hooks 未配置。
 4. 路由器 DHCP 绑定的具体菜单名因品牌而异。

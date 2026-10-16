@@ -128,7 +128,7 @@
 #include "app/game_snake/game_snake.h"
 #endif
 
-#define APP_LHLXW_USE 1
+#define APP_LHLXW_USE 0 // 关闭以给内置中文字体腾 Flash
 #if APP_LHLXW_USE
 #include "app/LHLXW/LHLXW.h"
 #endif
