@@ -67,7 +67,7 @@ void ai_status_gui_init(void)
     lbl_list = mk_label(f_small, lv_color_hex(0x999999), 166, 230);
     lv_obj_set_height(lbl_list, 50);
     lbl_ip = mk_label(&lv_font_montserrat_14, lv_color_hex(0x6080A0), 218, 236);
-    lv_label_set_text(lbl_ip, "WiFi connecting...");
+    lv_label_set_text(lbl_ip, "USB serial 115200");
 }
 
 void ai_status_gui_set_ip(const char *line)
@@ -91,7 +91,7 @@ void ai_status_gui_render(const AiAgent *a, int n, int cur, unsigned long now)
         lv_label_set_text(lbl_state, "no data");
         lv_obj_set_style_bg_color(dot, lv_color_hex(0x404040), 0);
         lv_obj_set_style_text_color(lbl_state, lv_color_hex(0x808080), 0);
-        lv_label_set_text(lbl_text, "POST /status\n{agent,state,text}");
+        lv_label_set_text(lbl_text, "waiting for USB...\n{agent,state,text}");
         lv_label_set_text(lbl_elapsed, "");
         lv_label_set_text(lbl_list, "");
         return;

@@ -248,6 +248,9 @@ void loop()
         isCheckAction = false;
         act_info = mpu.getAction();
     }
+#if APP_AI_STATUS_USE
+    ai_status_serial_poll(app_controller); // USB 串口上的 AI 状态行
+#endif
     app_controller->main_process(act_info); // 运行当前进程
     // Serial.println(ambLight.getLux() / 50.0);
     // rgb.setBrightness(ambLight.getLux() / 500.0);

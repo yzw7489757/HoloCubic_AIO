@@ -4,9 +4,9 @@ title: HoloCubic「AI 状态灵动岛」零基础使用指南（macOS + Wi-Fi）
 
 # HoloCubic「AI 状态灵动岛」零基础使用指南
 
-> 适用：HoloCubic 透明小电视 + HoloCubic_AIO 固件 v2.1.13 + 新增的 `AIStatus` APP；电脑为 macOS，使用 Wi-Fi。
+> 适用：HoloCubic 透明小电视（实测 ESP32-PICO-D4）+ HoloCubic_AIO 固件 v2.1.13 + 新增的 `AIStatus` APP（v0.2，USB 串口版）；电脑为 macOS。
 >
-> 效果：Claude Code / Codex / Grok 工作时，小电视实时显示 **谁、在干什么、多久了**，RGB 灯同步变色。
+> 效果：Claude Code / Codex / Grok 工作时（通过 **USB 数据线**，不需要 Wi-Fi），小电视实时显示 **谁、在干什么、多久了**，RGB 灯同步变色。
 >
 > 标注说明：**【已核对代码】** 表示根据仓库源码确认；**【未实机验证】** 表示还没有在真实硬件/Mac 上跑过，请以实际为准。
 
@@ -16,11 +16,12 @@ title: HoloCubic「AI 状态灵动岛」零基础使用指南（macOS + Wi-Fi）
 
 ```
 AI 工具 (Claude/Codex/Grok) ──hook 触发──▶ ~/.holocube/holocube_notify.sh
-          ──curl POST JSON──▶ http://小电视IP:8080/status ──▶ 屏幕 + RGB 灯
+     ──USB 串口 115200，一行 JSON──▶ 小电视 ──▶ 屏幕 + RGB 灯（回复 AIS:OK）
 ```
 
-- 小电视和 Mac 必须在**同一个 Wi-Fi（同一网段）**。
-- 只有在小电视上**进入 AIStatus APP 后**，8080 端口才会监听。
+- 小电视用 USB 线连在 Mac 上即可，**不需要 Wi-Fi**。适合公司网络需要网页认证登录、设备连不上的情况。
+- 状态和日志走同一个串口。小电视收到状态时，无论当前在菜单还是其他 APP，都会**自动切换进 AIStatus**（Settings APP 正在用串口时除外）。
+- 同一时间串口只能被一个程序打开：开着串口监视器时，状态发不过去。
 
 ---
 
@@ -32,7 +33,7 @@ AI 工具 (Claude/Codex/Grok) ──hook 触发──▶ ~/.holocube/holocube_no
 | HoloCubic 小电视 | 已组装好的 ESP32 版（Naive / Metal 均可）。 |
 | USB 数据线 | **必须能传数据**。很多随手拿的线只能充电，插上后电脑完全没反应。 |
 | microSD 卡（可选） | AIStatus **不需要** SD 卡，中文字体已内置（见 5.2）。相册、视频、天气图标等其他 APP 才需要。官方 Q&A 推荐爱国者 32G、闪迪 32G 普通卡。 |
-| 2.4 GHz Wi-Fi | ESP32 **不支持 5 GHz**。双频合一的路由器建议单独开一个 2.4G 名称。 |
+| 2.4 GHz Wi-Fi（可选） | USB 模式**不需要** Wi-Fi；只有 Wi-Fi 模式（8.6）才需要，且不支持 5 GHz 和网页认证。 |
 | 供电 | 电脑 USB 口或 5V/1A 以上充电头。供电不足时，连 Wi-Fi 那一刻容易重启。 |
 
 ### 1.2 Mac 软件
@@ -111,6 +112,8 @@ monitor_port = /dev/cu.usbserial-0001
 - `upload_speed = 921600`，`monitor_speed = 115200`。
 - 分区表 `partitions-no-ota.csv`，即**没有 OTA**，只能用 USB 刷机。
 
+> ⚠️ **ESP32-PICO-D4 必须用 DIO + 40 MHz**：本分支的 `platformio.ini` 已改为 `board_build.flash_mode = dio`、`board_build.f_flash = 40000000L`。原仓库是 QIO 80 MHz，实测在 PICO-D4 上**反复重启**【用户实机确认】。
+
 ### 3.3 编译 & 上传
 VS Code 底部蓝色状态栏上的几个按钮：
 
@@ -136,11 +139,20 @@ pio device monitor -b 115200                   # 串口日志，Ctrl+C 退出
     3. 如果板子上有 BOOT/IO0 按键：按住它，再点上传，看到 `Writing at…` 后松开。很多 HoloCubic 主板靠自动下载电路，没有按键；这时换线、换口，并检查焊接。
 - 官方 Q&A 原话：用 AIO 上位机刷机卡住不动，请检查主板（不要怀疑工具或固件）。
 
-### 3.5 关于「首次完整刷机」和官方上位机 AIO_Tool
+### 3.5 不装 VS Code 也能刷：预编译固件包 + flash.sh
+仓库 Release 页提供 `holocube_flash.tgz`，里面有：
 
-- PlatformIO 的 Upload 会把 **bootloader + 分区表 + boot_app0 + 固件** 一起写入，所以一般不需要另外处理 bootloader。这是 PlatformIO/Arduino-ESP32 的通常行为【未实机验证】。
-- 官方另有「上位机」`AIO_Tool`（仓库 `AIO_Tool/`，Python 源码，作者主要提供 Windows `CubicAIO_Tool.exe`）。它需要 `bootloader`、`partitions.bin`、`boot_app0.bin` 和固件 bin 四个文件。仓库里 `AIO_Tool/base_bin/` 带的是 `bootloader_qio_80m.bin`，README 写的是 `bootloader_dio_40m.bin`，两者不一致【已核对文档】。**Mac 用户建议直接用 PlatformIO**，不必用上位机。
-- 系统设置（Wi-Fi 等）存在板载 Flash 的文件系统中（`/sys.cfg` 等，SPIFFS）。如果以前刷的固件分区布局不同，刷完后可能需要重新配 Wi-Fi【推断，未实机验证】。
+- `bootloader_dio_40m.bin`、`partitions.bin`、`boot_app0.bin`、`firmware.bin`
+- `flash.sh`：一键刷写，已设置 DIO/40m，写入地址依次为 0x1000、0x8000、0xe000、0x10000
+- `SHA256SUMS`
+
+```bash
+tar xzf holocube_flash.tgz && cd holocube_flash
+./flash.sh /dev/cu.usbserial-0001      # 不写端口会自动探测
+```
+`flash.sh` 默认使用 `~/.holocube-pio/bin/esptool`，也可以用 `ESPTOOL=/path/to/esptool ./flash.sh` 指定。命令里用的是 `write-flash` 写法，需要较新的 esptool（4.8 以上 / 5.x）。老版本 esptool 要写成 `write_flash`【未在 Mac 实机验证】。
+
+官方上位机 AIO_Tool 主要面向 Windows，Mac 用户不需要。
 
 ### 3.6 串口监视，确认开机正常
 打开 Serial Monitor（115200），按一下板子复位或重新插线，正常会看到：
@@ -150,16 +162,7 @@ pio device monitor -b 115200                   # 串口日志，Ctrl+C 退出
 
 ---
 
-## 4. 连接 Wi-Fi（使用原固件自带的 WebServer）
-
-【已核对代码】要点：
-
-- 热点名 `HoloCubic_AIO`，**无密码**（`network.cpp: AP_SSID`，`open_ap(..., password=NULL)`）。
-- 热点 IP 固定为 **`192.168.4.2`**（`network.cpp: local_ip(192,168,4,2)`）。
-- 配置后台也支持域名 `http://holocubic`，但部分浏览器不支持，推荐用 IP。
-- Wi-Fi 名称/密码保存在 Flash（`/sys.cfg`），**与 SD 卡无关**。
-
-### 4.1 手势基础（所有 APP 通用）
+## 4. 手势基础（所有 APP 通用）
 【已核对代码 + README】：
 
 | 手势 | 在菜单里 | 在 APP 里 |
@@ -168,48 +171,26 @@ pio device monitor -b 115200                   # 串口日志，Ctrl+C 退出
 | **向前倾并保持约 1 秒** | **进入** APP | — |
 | **向后仰并保持约 1 秒** | — | **退出** APP（返回菜单） |
 
-固件需要连续 3 次检测到同一方向（长按）才判定为进入/退出，所以**要保持住**，不是点一下。
+- 进入和退出需要连续 3 次检测到同一方向（每 200 ms 采样一次），所以要**保持住**。
+- 本分支把左右切换改为需要**连续 2 次（约 0.4 秒）**同向才算，阈值也调高了，详见 7.3。
+- 如果方向是反的，可以在 Web 设置里调整「操作方向（0~15可选）」。
+- **开机时请把小电视平放、别碰它**，大约等 2 秒，它在做陀螺仪校准和静止零点采样。
 
-如果你的方向感觉是反的，可以在 Web 设置里调整「操作方向（0~15可选）」(`mpu_order`)。
-
-### 4.2 配网步骤
-
-1. 小电视开机后，左/右倾找到 **WebServer**（菜单里名字是 `WebServer`），前倾 1 秒进入。
-2. 屏幕显示 `WebServer Start`、`Domain: holocubic`，稍等后显示两个 IP：**Local IP**（连上路由器后的地址）和 **AP IP**（`192.168.4.2`）。
-3. Mac 右上角 Wi-Fi → 选择 **`HoloCubic_AIO`**（无密码）。macOS 可能提示「无互联网连接」，这是正常的。
-4. 浏览器打开 **`http://192.168.4.2`**，进入「系统设置」页（`/sys_setting`）。
-5. 填写：
-   - `WiFi SSID_0(2.4G)`：你家 Wi-Fi 名称，大小写要一致。
-   - `WiFi Passwd_0`：Wi-Fi 密码。
-   - 可选：「开机自启的APP名字」填 **`AIStatus`**，以后开机直接进入 AI 状态界面。
-6. 点保存。
-7. 后仰 1 秒退出 WebServer。Mac 切回你家的 Wi-Fi。
-
-> 页面上的字段文字以实际网页为准。代码里 SSID 字段名为 `ssid_0`、自启字段为 `auto_start_app`【已核对代码】。
+> USB 模式**不需要配置 Wi-Fi**。如果以后想用 Wi-Fi 模式，见附录 8.6。
 
 ---
 
-## 5. 进入 AIStatus，查看 IP
+## 5. 进入 AIStatus
 
-1. 回到菜单，**第一个 APP** 就是 **AIStatus**（图标：白色胶囊 + 三个圆点），前倾 1 秒进入。
-2. 屏幕底部先显示 `WiFi connecting...`，连上后变成 `192.168.x.x:8080`。串口同时打印：
-   ```
-   [AIStatus] HTTP server: http://192.168.x.x:8080/status
-   ```
-3. 屏幕布局（240×240）：
+1. 菜单**第一个 APP** 就是 **AIStatus**（图标：白色胶囊 + 三个圆点），前倾 1 秒进入。
+2. 不进入也可以：电脑一发状态，小电视会**自动切换进 AIStatus**。
+3. 没有数据时显示 `no data` / `waiting for USB...`，底部显示 `USB serial 115200`。
+4. 屏幕布局（240×240）：
    - 顶部：agent 名字。
-   - 中部：彩色圆点 + 状态大字，下面是消息文本（最多约 3 行，过长加 `...`）。
+   - 中部：彩色圆点 + 状态大字，下面是消息文本（最多约 3 行）。
    - 下方：当前状态持续时间，以及其他 agent 的小列表（最多 4 个）。
-4. 退出：后仰 1 秒。退出后 RGB 灯会恢复成你原来的灯效设置。
-
-### 5.1 强烈建议：固定 IP
-每次重启 IP 都可能变，变了脚本就发不到。做法：
-
-1. 浏览器登录路由器后台（常见地址 `192.168.1.1` 或 `192.168.0.1`，背面贴纸上有）。
-2. 找「DHCP 静态分配 / IP 与 MAC 绑定 / 地址保留」。
-3. 在设备列表里找到小电视（主机名是 `HoloCubic`【已核对代码 network.cpp】，或看 MAC），绑定当前 IP。
-
-各品牌路由器菜单名不同【未验证具体品牌】。
+5. 退出：后仰 1 秒，RGB 灯恢复原来的灯效。之前收到的状态会保留，下次进入直接显示。
+6. 想开机就进入：在 Web 设置的「开机自启的APP名字」里填 `AIStatus`。这需要 WebServer 热点，见 8.6；USB 模式下也可以不设，靠自动切换。
 
 ### 5.2 中文显示（已内置，无需 SD 卡）
 中文字体已经**直接编译进固件**，不需要 SD 卡，刷完固件就能显示中文和常用 emoji【已核对代码 / 已编译】。
@@ -227,40 +208,47 @@ pio device monitor -b 115200                   # 串口日志，Ctrl+C 退出
 
 ## 6. 电脑端接入
 
-以下命令都在「终端」中执行。`ai_status_bridge` 换成你实际解压的位置，例如 `~/Downloads/holocubic_ai_status/ai_status_bridge`。
+以下命令都在「终端」中执行。`ai_status_bridge` 换成你实际解压的位置。
 
 ### 6.1 安装通知脚本
 ```bash
 mkdir -p ~/.holocube
-cp ai_status_bridge/holocube_notify.sh ai_status_bridge/sanitize_text.py ai_status_bridge/ai_cn16_charset.txt \
+cp ai_status_bridge/holocube_notify.sh ai_status_bridge/holocube_serial_send.py \
+   ai_status_bridge/sanitize_text.py ai_status_bridge/ai_cn16_charset.txt \
    ai_status_bridge/test_states.sh ai_status_bridge/grok_wrapper.sh ~/.holocube/
-chmod +x ~/.holocube/*.sh
-echo "192.168.1.50" > ~/.holocube_ip       # ← 换成你屏幕上看到的 IP（不写端口默认 8080）
+chmod +x ~/.holocube/*.sh ~/.holocube/*.py
 ```
-也可以用环境变量临时指定：`export CUBE_IP=192.168.1.50`，它的优先级高于文件。
 
-脚本特点【已在 Linux 用模拟服务测试】：
+- **串口自动探测**：顺序是 `/dev/cu.usbserial-*`、`cu.wchusbserial*`、`cu.SLAB_USBtoUART*`。
+- **手动指定端口**（Mac 上插了多个串口设备时建议这样做）：
+  ```bash
+  ls /dev/cu.*
+  echo /dev/cu.usbserial-0001 > ~/.holocube_port     # 或临时: export CUBE_PORT=/dev/cu.usbserial-0001
+  ```
+- **需要带 pyserial 的 Python**：脚本依次尝试 `~/.holocube-pio/bin/python3`、`~/.platformio/penv/bin/python3`、`python3`。PlatformIO 自带的 Python 一般已包含 pyserial。
 
-- 在后台发送，连接超时 1 秒、总超时 2 秒。
-- 小电视关机也**不会卡住 AI 工具**，脚本总是正常退出。
+脚本特点【已在 Linux 用虚拟串口测试】：
 
-### 6.2 用 curl 测试（确认网络通）
+- 在后台发送，hook 本身约 0.05 秒就返回。
+- 多个 hook 同时触发时排队，排队超过 1.5 秒的消息会被丢弃。
+- 端口被占用或拔掉线时静默放弃，错误写到 `$TMPDIR/holocube_notify.err`。
+- 打开串口时 DTR/RTS 保持释放，目的是**不让 ESP32 被复位**【未在 Mac 实机验证】。
+
+### 6.2 连通测试
+**先关闭串口监视器**（它会占用端口），再运行：
 ```bash
-curl http://192.168.1.50:8080/status
+~/.holocube-pio/bin/python3 ~/.holocube/holocube_serial_send.py --check
 ```
-应返回类似 `{"ok":true,"app":"AIStatus","ip":"...","agents":[]}`。然后：
+应打印 `/dev/cu.usbserial-xxxx AIS:PONG`。然后发一个状态：
 ```bash
-curl -X POST http://192.168.1.50:8080/status \
-  -H 'Content-Type: application/json' \
-  -d '{"agent":"claude","state":"thinking","text":"hello cube"}'
+~/.holocube/holocube_notify.sh thinking claude "你好，方块 🚀"
 ```
-屏幕应显示 `claude / thinking / hello cube`，圆点和灯变蓝。
+小电视应切到 AIStatus，显示 `claude / thinking / 你好，方块 🚀`，灯变蓝。
 
 ### 6.3 跑一遍所有状态
 ```bash
 ~/.holocube/test_states.sh
 ```
-每 2 秒切换一次 idle→thinking→working→waiting→done→error，最后加入 codex、grok 两条，用来检查多 agent 列表。
 
 ### 6.4 Claude Code
 事件名已对照 Claude Code 官方 hooks 文档（code.claude.com/docs/en/hooks）核对。
@@ -330,8 +318,11 @@ notify = ["/Users/你的用户名/.holocube/holocube_notify.sh", "--codex"]
 | 反复重启，尤其在连 Wi-Fi 时；发热严重 | 供电不足；屏幕板/主板 LDO 方案发热、压降大 | 换供电充足的 USB 口或充电头；参考仓库 `硬件版本说明.md`：Metal 屏幕板 v1.2+ 加了一路 LDO 分担电流，v2.0/v2.1 可改焊 DC-DC 方案（此时去掉主板 LDO）以根治发热 |
 | 白屏、花屏、黑屏但串口正常 | 屏幕焊接/排线问题；屏幕型号不符（需 1.3 寸 ST7789 240×240）；`TFT_eSPI` 配置被改 | 检查屏幕焊接；不要随意修改 `lib/TFT_eSPI/User_Setup.h`；背光引脚在 `src/common.h` 中为 IO5（PEAK 版为 IO12） |
 | 串口出现 `sdcard_mount(): f_mount failed: (3) The physical drive cannot work` | 没插卡、卡不兼容、卡槽焊接问题、格式不对 | AIStatus 不需要 SD 卡，**可忽略**；其他 APP 需要时：换官方推荐的 32G 卡并格式化为 FAT32，检查卡槽焊接（SD 用 SPI：SCK14/MISO26/MOSI13/SS15）。代码里 SD 的 SPI 时钟设为 80 MHz，个别卡不稳定属已知兼容性问题（官方 issue 有此报错） |
-| AIStatus 一直显示 `WiFi connecting...` | 没配 Wi-Fi；用的是 5G；密码错；信号弱 | 按第 4 章配网；确认 2.4G；SSID 大小写一致；看串口日志；靠近路由器 |
-| Mac 上 curl 超时、访问不了 IP | 不在同一网络；访客网络 / AP 隔离；IP 变了；没进入 AIStatus；端口写错 | Mac 和小电视连同一个 Wi-Fi，且不是访客网络；关闭路由器「AP 隔离 / 客户端隔离」；看屏幕底部最新 IP；**必须在 AIStatus APP 内**；端口是 **8080**（80 是 WebServer APP 的） |
+| （Wi-Fi 模式）一直显示 `WiFi...` | 没配 Wi-Fi；5G；需要网页认证的网络；密码错 | 按 8.6 配网；或直接用默认的 USB 模式 |
+| 刷完反复重启（串口不停打印 boot 信息 / `flash read err`） | 用了 QIO 80 MHz | 确认 `platformio.ini` 为 `dio` + `40000000L`，或用 `flash.sh` 刷写 |
+| `--check` 没有回复 / `cannot open` | 串口被监视器占用；端口不对；固件不是新版本 | 关闭 Serial Monitor；`ls /dev/cu.*` 确认端口并写入 `~/.holocube_port`；重新刷 USB 版固件 |
+| 每发一次状态小电视就重启 | 打开串口时触发了自动复位电路 | 反馈给我们；临时办法：`stty -f /dev/cu.xxx -hupcl` 后再试【未验证】 |
+| 菜单自己左右乱切、日志不停出现 SHAKE | 开机校准时被移动；静止零点偏大；阈值过低 | 本分支已调高阈值并加了静止零点补偿（见 7.3）；开机保持平放不动；仍不行就打开 `IMU_DEBUG_RAW` 看数值 |
 | 手势不灵、乱切换、进不去 APP | 开机自动校准时被移动；MPU6050 焊接/I2C（SDA32/SCL33）问题；方向设置不对 | 开机时平放不动等校准完成；倾斜要**保持约 1 秒**；Web 设置里调整「操作方向（0~15可选）」；仍不行检查 MPU6050 焊接（官方 Q&A：IIC 焊接有问题会导致切换不了页面） |
 | 中文全部显示为方块/空白 | 刷的不是带内置中文字体的新固件 | 确认用 `ai-status` 分支最新代码重新编译上传 |
 | 个别汉字显示空白 | 该字不在 GB2312 一级字库（3755 字）里 | 属正常限制；需要的话扩充 `tools/sc.txt` 重新生成字体 |
@@ -346,11 +337,33 @@ notify = ["/Users/你的用户名/.holocube/holocube_notify.sh", "--codex"]
 ### 7.2 电脑端
 | 现象 | 原因 | 解决 |
 |---|---|---|
-| 手动 curl 正常，AI 工具触发后屏幕没变化 | IP 文件没写对；脚本没有执行权限；hooks 没加载 | `cat ~/.holocube_ip`；`chmod +x ~/.holocube/*.sh`；Claude 里输入 `/hooks` 检查 |
-| 想单独测试脚本 | — | `CUBE_IP=你的IP ~/.holocube/holocube_notify.sh working claude "test"` |
+| `--check` 正常，AI 工具触发后屏幕没变化 | 脚本没有执行权限；hooks 没加载；串口被监视器占用 | `chmod +x ~/.holocube/*.sh ~/.holocube/*.py`；Claude 里输入 `/hooks` 检查；查看 `$TMPDIR/holocube_notify.err` |
+| 想单独测试脚本 | — | `~/.holocube/holocube_notify.sh working claude "test"` |
 | `settings.json` 改完 Claude 报配置错误 | JSON 格式错（逗号、括号） | 把内容粘到在线 JSON 校验器检查，或运行 `python3 -m json.tool ~/.claude/settings.json` |
 | Codex 没反应 | `notify` 写在了某个 `[小节]` 下面；路径里用了 `~`；写在了项目配置里 | 放到文件最顶部；用 `/Users/用户名/...` 绝对路径；写在 `~/.codex/config.toml` |
 | 同一事件显示两次 / 名字变来变去 | Claude 与 Grok 共用一份 hooks，或 Grok 同时加载了两份 | 只保留一份配置 |
+
+### 7.3 手势防误触改动说明（本分支）
+现象：小电视静止放在桌上时，日志不停出现 `SHAKE`，还会偶尔出现 `TURN_LEFT`/`TURN_RIGHT`，菜单自己切换。
+
+改动【已编译，未实机验证效果】，位于 `src/driver/imu.h` / `imu.cpp`：
+
+1. **修复原代码 bug**：前后方向的「震动」判断误用了上一次的结构体 `action_info.v_ax`（从不更新），改为本次采样值。
+2. **静止零点补偿**：开机校准后采 20 个样，把静止时 ax/ay 的残余值记为零点并减掉。残余超过 3000 时不补偿，避免开机时拿在手上导致零点错误。串口会打印 `[IMU] rest ax=.. ay=.. -> bias ...`。
+3. **阈值调高**（±2g 量程下 16384 ≈ 1g）：
+
+| 判断 | 原阈值 | 新阈值 |
+|---|---|---|
+| 左右倾 | 4000（约 14°） | 5000（约 18°） |
+| 前倾/后仰 | 5000（约 18°） | 5500（约 20°） |
+| 震动 SHAKE | 1000（约 3.5°） | 2500（约 9°） |
+
+4. **左右切换需确认**：需要连续 2 次采样（约 0.4 秒）同向才切换。`IMU_TURN_CONFIRM 1` 可恢复原行为。
+
+还要注意：
+
+- 调试时可把 `IMU_DEBUG_RAW` 设为 1，每秒打印一次数值，便于把日志发来分析。
+- 日志里的 CPU 80 MHz 是「节能模式」（`power_mode=0`）的设置，与手势误触基本无关。手势每 200 ms 由定时器触发采样一次，与 CPU 频率无关。
 
 ---
 
@@ -366,37 +379,39 @@ notify = ["/Users/你的用户名/.holocube/holocube_notify.sh", "--codex"]
 | `done` | 完成 | 绿 `#20D060` |
 | `error` | 出错 | 红 `#FF3030` |
 
-### 8.2 API 说明（端口 8080，仅在 AIStatus APP 内可用）
-**POST `/status`**，`Content-Type: application/json`
+### 8.2 协议说明（USB 串口，115200 8N1）
+每条消息是**一行 JSON + 换行（`\n`）**，UTF-8 编码：
 ```json
-{"agent": "claude", "state": "working", "text": "Editing main.cpp"}
+{"agent": "claude", "state": "working", "text": "正在修改 main.cpp"}
 ```
 | 字段 | 说明 |
 |---|---|
-| `agent` | 名字，最长 23 字节（UTF-8 安全截断），不区分大小写匹配；缺省为 `agent` |
-| `state` | 必须是上表 6 个值之一（大小写不敏感），否则返回 400 |
-| `text` | 可选，超过 127 字节会按 UTF-8 字符边界截断并加 `...`；中文由固件内置字体显示（见 5.2） |
+| `agent` | 必填。名字，最长 23 字节（UTF-8 安全截断），不区分大小写匹配 |
+| `state` | 必填。必须是上表 6 个值之一（大小写不敏感） |
+| `text` | 可选。超过 127 字节会按字符边界截断并加 `...` |
 
-- 同时最多记录 4 个 agent，满了会替换最久没更新的那个。
+回复（也是一行，可能夹在日志中间，以 `AIS:` 开头）：
+
+- `AIS:OK`：已更新。
+- `AIS:ERR bad json` / `AIS:ERR bad state` / `AIS:ERR need agent+state`：内容有误。
+- 发送 `{"ping":1}` 回复 `AIS:PONG`。
+
+固件只处理**以 `{` 开头并且包含 `"agent"` 或 `"ping"`** 的行，其他任何输入都忽略。单行最长 383 字节，超长行整行丢弃。
+
+- 同时最多记录 4 个 agent，满了替换最久没更新的那个。
 - 最近一次更新的 agent 显示为主画面。
-- 状态没变时，计时不清零。
 
-成功返回 200，内容与 GET 相同。
-
-**GET `/status`**（健康检查），返回示例：
-```json
-{"ok":true,"app":"AIStatus","ip":"192.168.1.50","uptime_s":1234,
- "agents":[{"agent":"claude","state":"done","text":"...","elapsed_s":12}]}
-```
+可选 Wi-Fi 模式（编译时 `AI_STATUS_USE_WIFI 1`）：`POST http://<IP>:8080/status` 发同样的 JSON，`GET /status` 查询。
 
 ### 8.3 常用命令速查
 ```bash
-ls /dev/cu.*                                         # 找串口
-pio run -e HoloCubic_AIO_Releases -t upload          # 编译+上传
-pio device monitor -b 115200                         # 串口日志
-curl http://$(cat ~/.holocube_ip):8080/status        # 健康检查
-~/.holocube/holocube_notify.sh done claude "hi"      # 手动发送
-~/.holocube/test_states.sh                           # 全状态测试
+ls /dev/cu.*                                                  # 找串口
+pio run -e HoloCubic_AIO_Releases -t upload                   # 编译+上传
+pio device monitor -b 115200                                  # 串口日志（用完记得关，否则状态发不过去）
+~/.holocube-pio/bin/python3 ~/.holocube/holocube_serial_send.py --check   # 连通测试
+~/.holocube/holocube_notify.sh done claude "hi"               # 手动发送
+~/.holocube/test_states.sh                                    # 全状态测试
+./flash.sh /dev/cu.usbserial-0001                             # 用预编译包刷机
 ```
 
 ### 8.4 相关代码位置
@@ -406,14 +421,30 @@ curl http://$(cat ~/.holocube_ip):8080/status        # 健康检查
 | APP 开关 | `AIO_Firmware_PIO/src/app/app_conf.h` |
 | APP 安装顺序 | `AIO_Firmware_PIO/src/HoloCubic_AIO.cpp` |
 | 热点名 / AP IP | `AIO_Firmware_PIO/src/network.cpp` |
+| 串口状态解析 / WiFi 开关宏 | `src/app/ai_status/ai_status.cpp`、`ai_status.h`（`AI_STATUS_USE_WIFI`、`AI_STATUS_AUTO_ENTER`） |
+| 手势阈值 | `src/driver/imu.h`（`IMU_*` 宏） |
 | 网页配置 | `AIO_Firmware_PIO/src/app/server/` |
 | 引脚定义 | `AIO_Firmware_PIO/src/common.h` |
 | 手势识别 | `AIO_Firmware_PIO/src/driver/imu.cpp` |
 
 ### 8.5 尚未验证的事项（如实列出）
 
-1. AIStatus 固件和内置中文字体**未在真机上运行**（包括压缩字体的渲染效果和速度）：界面排版、RGB 灯颜色、与 WebServer APP 来回切换后端口是否正常释放，都需要实测。
-2. Mac 上的驱动安装、PlatformIO 上传流程未在 Mac 实机验证。
-3. Grok 读取 Claude hooks 只根据官方文档，未实测。Codex 新版 hooks 未配置。
-4. 路由器 DHCP 绑定的具体菜单名因品牌而异。
-5. 换固件后是否需要重新配网，取决于之前刷的版本。
+1. USB 版 AIStatus（串口解析、自动切换进 APP）**未在真机运行**。已确认的只有：编译通过，以及用户实测 DIO/40 MHz 能开机。
+2. 在 macOS 上打开串口会不会复位 ESP32，取决于 USB 转串口芯片和自动复位电路，需要实测。
+3. 手势阈值和零点补偿的实际效果需要实测，可能还要再调。
+4. `flash.sh` 用的 `write-flash` 写法依赖较新的 esptool。
+5. Grok 读取 Claude hooks 只根据官方文档，未实测。
+
+### 8.6 （可选）Wi-Fi 模式与 WebServer 配网
+**配网**【已核对代码】：
+
+- WebServer APP 会放出热点 `HoloCubic_AIO`（无密码），地址固定为 `http://192.168.4.2`。
+- 设置页的 `WiFi SSID_0(2.4G)` / `WiFi Passwd_0` 保存在 Flash。
+- 同一页可以设置「开机自启的APP名字」。
+
+**改用 Wi-Fi 模式**：
+
+1. 在 `src/app/ai_status/ai_status.h` 中设置 `#define AI_STATUS_USE_WIFI 1`，重新编译。
+2. 电脑上设置 `export CUBE_IP=<屏幕底部显示的IP>`，脚本就改走 HTTP。
+
+注意：需要网页认证（captive portal）的 Wi-Fi 无法使用，必须是普通 WPA/WPA2 的 2.4G 网络。

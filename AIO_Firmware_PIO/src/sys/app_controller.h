@@ -50,6 +50,8 @@ public:
     int remove_backgroud_task(void);
     int main_process(ImuAction *act_info);
     void app_exit(void); // 提供给app退出的系统调用
+    int app_enter(const char *name);   // 切换进入指定名字的APP（已在其中则不动作）
+    const char *current_app_name(void); // 当前所在APP的名字，在菜单中返回NULL
     // 消息发送
     int send_to(const char *from, const char *to,
                 APP_MESSAGE_TYPE type, void *message,

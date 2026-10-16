@@ -395,6 +395,32 @@ bool AppController::wifi_event(APP_MESSAGE_TYPE type)
     return true;
 }
 
+int AppController::app_enter(const char *name)
+{
+    int index = getAppIdxByName(name);
+    if (index < 0) return -1;
+    if (app_exit_flag == 1 && cur_app_index == index) return 0;
+    if (app_exit_flag == 1 && NULL != appList[cur_app_index]->exit_callback)
+    {
+        app_exit_flag = 0;
+        (*(appList[cur_app_index]->exit_callback))(NULL); // 退出当前app
+    }
+    app_exit_flag = 1;
+    cur_app_index = index;
+    if (NULL != appList[cur_app_index]->app_init)
+    {
+        (*(appList[cur_app_index]->app_init))(this);
+    }
+    return 0;
+}
+
+const char *AppController::current_app_name(void)
+{
+    if (app_exit_flag == 1 && cur_app_index >= 0 && cur_app_index < app_num)
+        return appList[cur_app_index]->app_name;
+    return NULL;
+}
+
 void AppController::app_exit()
 {
     app_exit_flag = 0; // 退出APP

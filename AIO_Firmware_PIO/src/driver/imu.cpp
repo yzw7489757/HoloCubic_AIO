@@ -19,6 +19,8 @@ IMU::IMU()
     }
     act_info_history_ind = ACTION_HISTORY_BUF_LEN - 1;
     this->order = 0; // 表示方位
+    rest_ax = 0;
+    rest_ay = 0;
 }
 
 void IMU::init(uint8_t order, uint8_t auto_calibration,
@@ -69,6 +71,26 @@ void IMU::init(uint8_t order, uint8_t auto_calibration,
         mpu_cfg->z_accel_offset = mpu.getZAccelOffset();
     }
 
+    // 采样静止零点：校准不完美或桌面略倾斜时，ax/ay 静止值可能超过 SHAKE 阈值，导致菜单自己乱切。
+    // 只在残余量不大时(|x|<IMU_REST_MAX)才记录，避免开机时手拿着倾斜导致零点错误。
+    {
+        long sx = 0, sy = 0;
+        const int n = 20;
+        for (int i = 0; i < n; i++)
+        {
+            ImuAction t;
+            getVirtureMotion6(&t);
+            sx += t.v_ax;
+            sy += t.v_ay;
+            delay(5);
+        }
+        sx /= n;
+        sy /= n;
+        rest_ax = (abs(sx) < IMU_REST_MAX) ? sx : 0;
+        rest_ay = (abs(sy) < IMU_REST_MAX) ? sy : 0;
+        Serial.printf("[IMU] rest ax=%ld ay=%ld -> bias ax=%d ay=%d\n", sx, sy, rest_ax, rest_ay);
+    }
+
     Serial.print(F("Initialization MPU6050 success.\n"));
 }
 
@@ -96,19 +118,32 @@ ImuAction *IMU::getAction(void)
     // Serial.printf("\tax = %d\tay = %d\taz = %d\n", tmp_info.v_ax, tmp_info.v_ay, tmp_info.v_az);
 
     tmp_info.active = ACTIVE_TYPE::UNKNOWN;
+    // 去掉静止零点
+    tmp_info.v_ax -= rest_ax;
+    tmp_info.v_ay -= rest_ay;
+#if IMU_DEBUG_RAW
+    {
+        static unsigned long last = 0;
+        if (millis() - last > 1000)
+        {
+            last = millis();
+            Serial.printf("[IMU] ax=%d ay=%d az=%d\n", tmp_info.v_ax, tmp_info.v_ay, tmp_info.v_az);
+        }
+    }
+#endif
 
     // 原先判断的只是加速度，现在要加上陀螺仪
     if (ACTIVE_TYPE::UNKNOWN == tmp_info.active)
     {
-        if (tmp_info.v_ay > 4000)
+        if (tmp_info.v_ay > IMU_TURN_TH)
         {
             tmp_info.active = ACTIVE_TYPE::TURN_LEFT;
         }
-        else if (tmp_info.v_ay < -4000)
+        else if (tmp_info.v_ay < -IMU_TURN_TH)
         {
             tmp_info.active = ACTIVE_TYPE::TURN_RIGHT;
         }
-        else if (tmp_info.v_ay > 1000 || tmp_info.v_ay < -1000)
+        else if (tmp_info.v_ay > IMU_SHAKE_TH || tmp_info.v_ay < -IMU_SHAKE_TH)
         {
             // 震动检测
             tmp_info.active = ACTIVE_TYPE::SHAKE;
@@ -117,15 +152,16 @@ ImuAction *IMU::getAction(void)
 
     if (ACTIVE_TYPE::UNKNOWN == tmp_info.active)
     {
-        if (tmp_info.v_ax > 5000)
+        if (tmp_info.v_ax > IMU_UPDOWN_TH)
         {
             tmp_info.active = ACTIVE_TYPE::UP;
         }
-        else if (tmp_info.v_ax < -5000)
+        else if (tmp_info.v_ax < -IMU_UPDOWN_TH)
         {
             tmp_info.active = ACTIVE_TYPE::DOWN;
         }
-        else if (action_info.v_ax > 1000 || action_info.v_ax < -1000)
+        // 原代码这里误用了 action_info.v_ax（上一次的结构体，未更新），改为本次采样
+        else if (tmp_info.v_ax > IMU_SHAKE_TH || tmp_info.v_ax < -IMU_SHAKE_TH)
         {
             // 震动检测
             tmp_info.active = ACTIVE_TYPE::SHAKE;
@@ -145,7 +181,14 @@ ImuAction *IMU::getAction(void)
         int second = (index + ACTION_HISTORY_BUF_LEN - 1) % ACTION_HISTORY_BUF_LEN;
         int third = (index + ACTION_HISTORY_BUF_LEN - 2) % ACTION_HISTORY_BUF_LEN;
         // 先识别"短按" （注：不要写成else if）
-        if (ACTIVE_TYPE::UNKNOWN != tmp_info.active)
+        // 左右倾需要连续 IMU_TURN_CONFIRM 次采样(每次200ms)一致才算，过滤桌面震动/噪声
+        bool confirmed = true;
+        if (IMU_TURN_CONFIRM >= 2 && (ACTIVE_TYPE::TURN_LEFT == tmp_info.active ||
+                                      ACTIVE_TYPE::TURN_RIGHT == tmp_info.active))
+        {
+            confirmed = (act_info_history[second] == tmp_info.active);
+        }
+        if (ACTIVE_TYPE::UNKNOWN != tmp_info.active && confirmed)
         {
             action_info.isValid = 1;
             action_info.active = tmp_info.active;
