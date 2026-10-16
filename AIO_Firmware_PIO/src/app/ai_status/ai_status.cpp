@@ -2,6 +2,8 @@
 // USB 串口(默认, 115200, 与日志同一个口): 发送一行 JSON + '\n'
 //   {"agent":"claude","state":"thinking","text":"..."}   -> 回复 "AIS:OK" 或 "AIS:ERR <原因>"
 //   {"ping":1}                                           -> 回复 "AIS:PONG"
+//   {"brightness":N} (0-100, 立即生效并写入 /sys.cfg)      -> 回复 "AIS:OK brightness=N"（不切换 APP）
+//   {"get":"brightness"}                                 -> 回复 "AIS:brightness=N"
 // WiFi (AI_STATUS_USE_WIFI=1 时): POST /status 同样的 JSON；GET /status 查询
 #include "ai_status.h"
 #include "ai_status_gui.h"
@@ -122,15 +124,62 @@ static char s_line[SERIAL_LINE_MAX];
 static size_t s_len = 0;
 static bool s_overflow = false;
 
+// 串口控制命令：{"brightness":N} 设置并保存屏幕亮度；{"get":"brightness"} 查询。
+// 返回 true 表示本行是控制命令（已回复），不会自动切换 APP
+static bool handle_command(AppController *sys, const char *p, size_t len)
+{
+    if (!strstr(p, "\"brightness\"")) return false;
+    DynamicJsonDocument doc(256);
+    if (deserializeJson(doc, p, len))
+    {
+        Serial.println("AIS:ERR bad json");
+        return true;
+    }
+    if (doc.containsKey("brightness"))
+    {
+        JsonVariant v = doc["brightness"];
+        if (!v.is<int>() && !v.is<float>())
+        {
+            Serial.println("AIS:ERR brightness must be 0-100");
+            return true;
+        }
+        long n = v.as<long>();
+        if (n < 0 || n > 100)
+        {
+            Serial.println("AIS:ERR brightness must be 0-100");
+            return true;
+        }
+        screen.setBackLight(n / 100.0); // 立即生效（与开机时 screen.init 用法相同）
+        // 与 Web 设置页相同的保存路径：SET_PARAM backLight -> WRITE_CFG（写 /sys.cfg）
+        char val[8];
+        snprintf(val, sizeof(val), "%ld", n);
+        sys->send_to(AI_STATUS_APP_NAME, CTRL_NAME, APP_MESSAGE_SET_PARAM, (void *)"backLight", (void *)val);
+        sys->send_to(AI_STATUS_APP_NAME, CTRL_NAME, APP_MESSAGE_WRITE_CFG, NULL, NULL);
+        Serial.printf("AIS:OK brightness=%ld\n", n);
+        return true;
+    }
+    const char *g = doc["get"] | "";
+    if (!strcmp(g, "brightness"))
+    {
+        Serial.printf("AIS:brightness=%u\n", (unsigned)sys->sys_cfg.backLight);
+        return true;
+    }
+    Serial.println("AIS:ERR unknown command");
+    return true;
+}
+
 static void handle_line(AppController *sys)
 {
     s_line[s_len] = 0;
-    // 只接受以 '{' 开头且含 "agent" 或 "ping" 的行（忽略其他任何输入/噪声）
+    // 只接受以 '{' 开头且含 "agent"/"ping"/"brightness" 的行（忽略其他任何输入/噪声）
     const char *p = s_line;
     while (*p == ' ' || *p == '\t') p++;
-    if (*p != '{' || (!strstr(p, "\"agent\"") && !strstr(p, "\"ping\""))) return;
+    if (*p != '{') return;
+    size_t len = s_len - (p - s_line);
+    if (handle_command(sys, p, len)) return;
+    if (!strstr(p, "\"agent\"") && !strstr(p, "\"ping\"")) return;
     bool is_ping;
-    const char *err = ai_apply_json(p, s_len - (p - s_line), &is_ping);
+    const char *err = ai_apply_json(p, len, &is_ping);
     if (err)
     {
         Serial.printf("AIS:ERR %s\n", err);
@@ -321,6 +370,6 @@ static void ai_status_message_handle(const char *from, const char *to,
 #endif
 }
 
-APP_OBJ ai_status_app = {AI_STATUS_APP_NAME, &app_ai_status, "AI agent status display\nVersion 0.2.0 (USB)\n",
+APP_OBJ ai_status_app = {AI_STATUS_APP_NAME, &app_ai_status, "AI agent status display\nVersion 0.2.1 (USB)\n",
                          ai_status_init, ai_status_process, ai_status_background_task,
                          ai_status_exit_callback, ai_status_message_handle};

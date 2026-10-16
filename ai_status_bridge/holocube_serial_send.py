@@ -3,6 +3,8 @@
 用法:
   holocube_serial_send.py '<json>'            发送一行，最多等 0.6s 读 AIS:OK（读不到也不报错）
   holocube_serial_send.py --check             发送 {"ping":1} 并打印设备回复（诊断用）
+  holocube_serial_send.py --brightness N      设置屏幕亮度 0-100（立即生效并保存），打印 AIS:OK brightness=N
+  holocube_serial_send.py --brightness        查询当前亮度（同 --get-brightness），打印 AIS:brightness=N
 端口: 环境变量 CUBE_PORT > ~/.holocube_port 文件 > 自动探测 /dev/cu.usbserial-* 等
 需要 pyserial（~/.holocube-pio/bin/python3 自带）。任何错误都只打印到 stderr，退出码 0。
 """
@@ -26,8 +28,26 @@ def find_port():
     return None
 
 def main():
-    check = len(sys.argv) > 1 and sys.argv[1] == "--check"
-    line = '{"ping":1}' if check else (sys.argv[1] if len(sys.argv) > 1 else "")
+    a = sys.argv[1:]
+    check = False  # True: 打印回复（--check / --brightness / --get-brightness）
+    if a and a[0] == "--check":
+        check, line = True, '{"ping":1}'
+    elif a and a[0] == "--brightness":
+        if len(a) < 2:  # 无数值 = 查询
+            check, line = True, '{"get":"brightness"}'
+        else:
+            try:
+                n = int(a[1])
+            except ValueError:
+                n = -1
+            if not 0 <= n <= 100:
+                print("usage: holocube_serial_send.py --brightness N   (N = 0-100)", file=sys.stderr)
+                sys.exit(2)
+            check, line = True, '{"brightness":%d}' % n
+    elif a and a[0] == "--get-brightness":
+        check, line = True, '{"get":"brightness"}'
+    else:
+        line = a[0] if a else ""
     if not line:
         return
     try:

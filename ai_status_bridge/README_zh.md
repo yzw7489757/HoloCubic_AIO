@@ -17,6 +17,8 @@ chmod +x ~/.holocube/*.sh ~/.holocube/*.py
 ls /dev/cu.*                                   # 找到小电视的串口，例如 /dev/cu.usbserial-0001
 echo /dev/cu.usbserial-0001 > ~/.holocube_port # 可选；不写就自动探测 /dev/cu.usbserial-* 等
 ~/.holocube-pio/bin/python3 ~/.holocube/holocube_serial_send.py --check   # 应打印 AIS:PONG
+~/.holocube-pio/bin/python3 ~/.holocube/holocube_serial_send.py --brightness 50  # 设亮度 0-100（保存，重启保持）
+~/.holocube-pio/bin/python3 ~/.holocube/holocube_serial_send.py --brightness     # 查询亮度
 ~/.holocube/test_states.sh
 ```
 需要带 pyserial 的 Python：脚本依次尝试 `~/.holocube-pio/bin/python3`、`~/.platformio/penv/bin/python3`、`python3`。

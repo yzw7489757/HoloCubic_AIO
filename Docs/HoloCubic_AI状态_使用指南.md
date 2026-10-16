@@ -395,8 +395,9 @@ notify = ["/Users/你的用户名/.holocube/holocube_notify.sh", "--codex"]
 - `AIS:OK`：已更新。
 - `AIS:ERR bad json` / `AIS:ERR bad state` / `AIS:ERR need agent+state`：内容有误。
 - 发送 `{"ping":1}` 回复 `AIS:PONG`。
+- 亮度（v0.2.1 起）：发送 `{"brightness":N}`（N 为 0–100 的整数）立即调整背光，并写入 `/sys.cfg`（与 Web 设置页同一保存路径），重启后保持；回复 `AIS:OK brightness=N`，超范围回复 `AIS:ERR brightness must be 0-100`。发送 `{"get":"brightness"}` 回复 `AIS:brightness=N`。这两条命令**不会**自动切到 AIStatus。注意 0 = 背光全关（屏幕全黑），一般用 10 以上。
 
-固件只处理**以 `{` 开头并且包含 `"agent"` 或 `"ping"`** 的行，其他任何输入都忽略。单行最长 383 字节，超长行整行丢弃。
+固件只处理**以 `{` 开头并且包含 `"agent"`、`"ping"` 或 `"brightness"`** 的行，其他任何输入都忽略。单行最长 383 字节，超长行整行丢弃。
 
 - 同时最多记录 4 个 agent，满了替换最久没更新的那个。
 - 最近一次更新的 agent 显示为主画面。
@@ -409,6 +410,8 @@ ls /dev/cu.*                                                  # 找串口
 pio run -e HoloCubic_AIO_Releases -t upload                   # 编译+上传
 pio device monitor -b 115200                                  # 串口日志（用完记得关，否则状态发不过去）
 ~/.holocube-pio/bin/python3 ~/.holocube/holocube_serial_send.py --check   # 连通测试
+~/.holocube-pio/bin/python3 ~/.holocube/holocube_serial_send.py --brightness 50   # 亮度设为 50 并保存
+~/.holocube-pio/bin/python3 ~/.holocube/holocube_serial_send.py --brightness      # 查询当前亮度
 ~/.holocube/holocube_notify.sh done claude "hi"               # 手动发送
 ~/.holocube/test_states.sh                                    # 全状态测试
 ./flash.sh /dev/cu.usbserial-0001                             # 用预编译包刷机
