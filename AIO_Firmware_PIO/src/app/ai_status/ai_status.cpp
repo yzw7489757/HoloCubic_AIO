@@ -17,7 +17,7 @@
 #endif
 
 #define UI_INTERVAL_MS 1000
-#define SERIAL_LINE_MAX 384
+#define SERIAL_LINE_MAX 640
 
 // ---- 常驻数据：APP 外收到的状态也保留，进入 APP 时直接显示 ----
 static AiAgent g_agents[AI_MAX_AGENTS];
@@ -292,11 +292,11 @@ static int ai_status_init(AppController *sys)
     rd->led_state = AI_STATE_NUM;
     ai_status_gui_init();
 #if AI_STATUS_USE_WIFI
-    ai_status_gui_set_ip("USB 115200 | WiFi...");
+    ai_status_gui_set_ip("USB|WiFi..");
     sys->send_to(AI_STATUS_APP_NAME, CTRL_NAME, APP_MESSAGE_WIFI_CONN, NULL, NULL);
     rd->last_alive = millis();
 #else
-    ai_status_gui_set_ip("USB serial 115200");
+    ai_status_gui_set_ip("USB");
 #endif
     g_dirty = true; // 显示 APP 外已收到的状态
     return 0;
@@ -370,6 +370,6 @@ static void ai_status_message_handle(const char *from, const char *to,
 #endif
 }
 
-APP_OBJ ai_status_app = {AI_STATUS_APP_NAME, &app_ai_status, "AI agent status display\nVersion 0.2.1 (USB)\n",
+APP_OBJ ai_status_app = {AI_STATUS_APP_NAME, &app_ai_status, "AI agent status display\nVersion 0.2.2 (USB)\n",
                          ai_status_init, ai_status_process, ai_status_background_task,
                          ai_status_exit_callback, ai_status_message_handle};

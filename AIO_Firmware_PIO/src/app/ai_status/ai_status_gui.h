@@ -19,7 +19,7 @@ enum AiState
 struct AiAgent
 {
     char name[24];
-    char text[128];
+    char text[361]; // 最多约 360 字节 UTF-8
     AiState state;
     unsigned long since_ms; // 进入当前状态的时间
     unsigned long update_ms;

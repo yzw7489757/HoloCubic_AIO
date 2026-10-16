@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 用法: sanitize_text.py "<文本>" [charset文件]
-# 把字体里没有的 emoji 换成 [中文说明] 或删除；按 UTF-8 字符边界截断到 120 字节
+# 把字体里没有的 emoji 换成 [中文说明] 或删除；按 UTF-8 字符边界截断到 340 字节
 import sys, os
 t = sys.argv[1] if len(sys.argv) > 1 else ""
 cf = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_cn16_charset.txt")
@@ -29,7 +29,7 @@ for ch in t:
     o.append(ch)
 t = "".join(o)
 b = t.encode("utf-8")
-if len(b) > 120:
-    b = b[:117]
+if len(b) > 340:
+    b = b[:337]
     t = b.decode("utf-8", "ignore") + "..."   # ignore 会丢掉被截断的半个字符
 sys.stdout.write(t)

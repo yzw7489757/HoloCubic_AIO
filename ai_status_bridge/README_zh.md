@@ -38,4 +38,4 @@ echo /dev/cu.usbserial-0001 > ~/.holocube_port # 可选；不写就自动探测 
 - Grok：默认会读取 `~/.claude/settings.json` 的 hooks；或者用 `grok_wrapper.sh grok` 启动。
 
 ## 字库
-固件内置 GB2312 一级 3755 字 + 常用符号 + 约 80 个 emoji。`sanitize_text.py` 会把字库外的 emoji 换成 `[文字]` 或删除，并按 UTF-8 字符边界截断到 120 字节。
+固件内置 GB2312 一级 3755 字 + 常用符号 + 约 80 个 emoji。`sanitize_text.py` 会把字库外的 emoji 换成 `[文字]` 或删除，并按 UTF-8 字符边界截断到 340 字节。
